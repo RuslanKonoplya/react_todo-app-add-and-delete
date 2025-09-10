@@ -9,23 +9,14 @@ export const getTodos = () => {
 
 // Add more methods here
 
-
-
-
-export const postTodo = ({ title } : { title: string }) => {
-
-  return client.post<Todo>(`/todos?userId=${USER_ID}`, {
+export const postTodo = ({ title }: { title: string }) => {
+  return client.post<Todo>(`/todos`, {
     title,
-    "completed": false,
+    completed: false,
     userId: USER_ID,
-});
-}
-
-
+  });
+};
 
 export function deleteTodo(postId: number) {
-
-
-
   return client.delete(`/todos/${postId}`);
 }

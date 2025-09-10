@@ -2,8 +2,8 @@
 /* eslint-disable jsx-a11y/control-has-associated-label */
 import React, { useEffect, useMemo, useState } from 'react';
 import { UserWarning } from './UserWarning';
-import { getTodos, USER_ID } from './api/todos';
-import { ErrorType, FilterType, Todo } from './types/Types';
+import { deleteTodo, getTodos, USER_ID } from './api/todos';
+import { ErrorType, FilterType, LoadedTodo, Todo } from './types/Types';
 import { TodoList } from './components/TodoList/TodoList';
 import classNames from 'classnames';
 import { FormAddTodo } from './components/FormAddTodo';
@@ -12,9 +12,35 @@ export const App: React.FC = () => {
   const [todos, setTodos] = useState<Todo[]>([]);
   const [sortFilter, setSortFilter] = useState<FilterType>(FilterType.All);
   const [error, setError] = useState<ErrorType>(ErrorType.None);
-  const [tempTodo, setTempTodo] = useState(null);
+  const [tempTodo, setTempTodo] = useState<Todo | null>(null);
+  const [deletedTodo, setDeletedTodo] = useState<number | null>(null);
 
+  const [loadedTodo, setLoadedTodo] = useState<LoadedTodo>({
+    isLoad: false,
+    id: null,
+  });
 
+  function handleDeleteCompleted() {
+    const completedTodos = todos.filter(todo => todo.completed);
+
+    Promise.allSettled(completedTodos.map(todo => deleteTodo(todo.id))).then(
+      results => {
+        results.forEach((result, index) => {
+          if (result.status === 'fulfilled') {
+            setTodos(prev =>
+              prev.filter(t => t.id !== completedTodos[index].id),
+            );
+          }
+        });
+
+        const hasError = results.some(r => r.status === 'rejected');
+
+        if (hasError) {
+          setError(ErrorType.CantDelete);
+        }
+      },
+    );
+  }
 
   const preparedTodos = useMemo(() => {
     if (sortFilter === 'Completed') {
@@ -30,7 +56,7 @@ export const App: React.FC = () => {
 
   const todosCounter = todos.filter(todo => !todo.completed).length;
 
-  const CompletedCount = todos.filter(todo => todo.completed).length;
+  const CompletedCount = todos.filter(todo => todo.completed).length < 1;
 
   useEffect(() => {
     getTodos()
@@ -54,9 +80,6 @@ export const App: React.FC = () => {
     return <UserWarning />;
   }
 
-
-console.log(todos)
-
   return (
     <div className="todoapp">
       <h1 className="todoapp__title">todos</h1>
@@ -72,19 +95,26 @@ console.log(todos)
 
           {/* Add a todo on form submit */}
 
-          <FormAddTodo setError={setError} setTodos={setTodos} setTempTodo={setTempTodo}  />
-
-
+          <FormAddTodo
+            setError={setError}
+            setTodos={setTodos}
+            CompletedCount={CompletedCount}
+            setTempTodo={setTempTodo}
+            loadedTodo={loadedTodo}
+            setLoadedTodo={setLoadedTodo}
+            deletedTodo={deletedTodo}
+          />
         </header>
 
-        <TodoList todos={preparedTodos} setTodos={setTodos} setError={setError} />
-
-        {tempTodo && (
-  <TodoList todos={[tempTodo]} setTodos={setTodos} setError={setError} />
-)}
-
-
-
+        <TodoList
+          todos={preparedTodos}
+          setTodos={setTodos}
+          setError={setError}
+          loadedTodo={loadedTodo}
+          tempTodo={tempTodo}
+          deletedTodo={deletedTodo}
+          setDeletedTodo={setDeletedTodo}
+        />
 
         {todos.length !== 0 && (
           <footer className="todoapp__footer" data-cy="Footer">
@@ -131,15 +161,15 @@ console.log(todos)
 
             {/* this button should be disabled if there are no completed todos */}
 
-            {CompletedCount > 0 && (
-              <button
-                type="button"
-                className="todoapp__clear-completed"
-                data-cy="ClearCompletedButton"
-              >
-                Clear completed
-              </button>
-            )}
+            <button
+              type="button"
+              className="todoapp__clear-completed"
+              data-cy="ClearCompletedButton"
+              onClick={handleDeleteCompleted}
+              disabled={CompletedCount}
+            >
+              Clear completed
+            </button>
           </footer>
         )}
       </div>
